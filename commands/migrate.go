@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"fmt"
+	_ "fmt"
 	"s3_file_uploader/migrations"
 	"s3_file_uploader/utils"
 
@@ -10,14 +10,17 @@ import (
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
-	Short: "Apply database migrations",
+	Short: "Run database migrations",
 	Run: func(cmd *cobra.Command, args []string) {
+		utils.InitMongoDB()
+
 		err := migrations.Up()
 		if err != nil {
-			utils.LogError(fmt.Sprintf("Migration failed: %v", err))
+			utils.MongoLogError("Migration failed: ", err)
 			return
 		}
-		utils.LogInfo("Migration completed successfully")
+
+		utils.MongoLogInfo("Migration completed successfully")
 	},
 }
 

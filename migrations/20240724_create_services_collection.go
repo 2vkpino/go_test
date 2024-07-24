@@ -2,49 +2,20 @@ package migrations
 
 import (
 	"context"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo"
 	"s3_file_uploader/utils"
 )
 
 func Up() error {
-	db := utils.MongoClient.Database("mydatabase")
+	if utils.MongoClient == nil {
+		return fmt.Errorf("MongoClient is not initialized")
+	}
 
-	// Определение параметров валидации для коллекции
-	collectionOptions := options.CreateCollection().SetValidator(bson.D{
-		{"$jsonSchema", bson.D{
-			{"bsonType", "object"},
-			{"required", bson.A{"name", "nfs_dir", "s3_bucket"}},
-			{"properties", bson.D{
-				{"name", bson.D{
-					{"bsonType", "string"},
-					{"description", "Service name is required and must be a string"},
-				}},
-				{"nfs_dir", bson.D{
-					{"bsonType", "string"},
-					{"description", "NFS directory is required and must be a string"},
-				}},
-				{"s3_bucket", bson.D{
-					{"bsonType", "string"},
-					{"description", "S3 bucket name is required and must be a string"},
-				}},
-				{"s3_region", bson.D{
-					{"bsonType", "string"},
-					{"description", "S3 region is optional and must be a string if provided"},
-				}},
-				{"created_at", bson.D{
-					{"bsonType", bson.A{"date", "null"}},
-					{"description", "Creation date must be a valid date or null"},
-				}},
-				{"updated_at", bson.D{
-					{"bsonType", bson.A{"date", "null"}},
-					{"description", "Last update date must be a valid date or null"},
-				}},
-			}},
-		}},
-	})
+	db := utils.MongoClient.Database(utils.MongoDBName)
 
-	// Проверка на существование коллекции
+	// Проверяем, существует ли коллекция
 	collections, err := db.ListCollectionNames(context.TODO(), bson.D{})
 	if err != nil {
 		return err
@@ -52,30 +23,71 @@ func Up() error {
 
 	for _, name := range collections {
 		if name == "services" {
-			utils.LogInfo("Collection 'services' already exists")
+			utils.MongoLogInfo("Collection 'services' already exists")
 			return nil
 		}
 	}
 
-	// Создание коллекции с валидацией
-	err = db.CreateCollection(context.TODO(), "services", collectionOptions)
+	// Создаем коллекцию
+	err = db.CreateCollection(context.TODO(), "services", createCollectionOptions())
 	if err != nil {
 		return err
 	}
 
-	utils.LogInfo("Collection 'services' created successfully with validation")
+	utils.MongoLogInfo("Collection 'services' created successfully")
 	return nil
 }
 
 func Down() error {
-	db := utils.MongoClient.Database("mydatabase")
+	if utils.MongoClient == nil {
+		return fmt.Errorf("MongoClient is not initialized")
+	}
 
-	// Удаление коллекции
+	db := utils.MongoClient.Database(utils.MongoDBName)
+
+	// Удаляем коллекцию
 	err := db.Collection("services").Drop(context.TODO())
 	if err != nil {
 		return err
 	}
 
-	utils.LogInfo("Collection 'services' dropped successfully")
+	utils.MongoLogInfo("Collection 'services' dropped successfully")
 	return nil
+}
+
+func createCollectionOptions() *mongo.CollectionOptions {
+	return &mongo.CollectionOptions{
+		Validator: bson.D{
+			{"$jsonSchema", bson.D{
+				{"bsonType", "object"},
+				{"required", []string{"name", "nfs_dir", "s3_bucket"}},
+				{"properties", bson.D{
+					{"name", bson.D{
+						{"bsonType", "string"},
+						{"description", "Service name is required and must be a string"},
+					}},
+					{"nfs_dir", bson.D{
+						{"bsonType", "string"},
+						{"description", "NFS directory is required and must be a string"},
+					}},
+					{"s3_bucket", bson.D{
+						{"bsonType", "string"},
+						{"description", "S3 bucket name is required and must be a string"},
+					}},
+					{"s3_region", bson.D{
+						{"bsonType", "string"},
+						{"description", "S3 region is optional and must be a string if provided"},
+					}},
+					{"created_at", bson.D{
+						{"bsonType", []string{"date", "null"}},
+						{"description", "Creation date must be a valid date or null"},
+					}},
+					{"updated_at", bson.D{
+						{"bsonType", []string{"date", "null"}},
+						{"description", "Last update date must be a valid date or null"},
+					}},
+				}},
+			}},
+		},
+	}
 }
